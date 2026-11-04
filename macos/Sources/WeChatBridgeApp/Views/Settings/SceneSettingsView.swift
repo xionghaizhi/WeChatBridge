@@ -581,7 +581,7 @@ private struct SceneListRow: View {
     }
 }
 
-private struct SceneEditor: View {
+struct SceneEditor: View {
     @Binding var scene: WeChatScene
     @Binding var enabled: Bool
     /// Whether this scene is the library's default — the menu offers 设为默认场景.
@@ -621,7 +621,12 @@ private struct SceneEditor: View {
                 VStack(alignment: .leading, spacing: Space.l) {
                     ReadOnlySceneField(title: L10n.text("名称"), text: scene.name)
                     ReadOnlySceneField(title: L10n.text("说明"), text: scene.summary)
-                    ReadOnlySceneField(title: L10n.text("提示词"), text: promptText)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(L10n.text("提示词")).font(Typo.captionStrong).foregroundStyle(Theme.inkSecondary)
+                        ScenePromptText(text: promptText.isEmpty ? L10n.text("无") : promptText,
+                                        height: 160, fontSize: 13.5, label: L10n.text("提示词"))
+                            .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.row))
+                    }
                 }
             } else {
                 SceneField(title: L10n.text("名称"), text: $scene.name)
@@ -737,12 +742,13 @@ private struct SceneEditor: View {
     }
 
     private var promptText: String {
-        [scene.instruction, scene.outputSpec.isEmpty ? "" : L10n.format("输出规范：\n%@", scene.outputSpec)]
+        guard !scene.outputSpec.isEmpty else { return scene.instruction }
+        return [scene.instruction, L10n.format("输出规范：\n%@", scene.outputSpec)]
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: "\n\n")
     }
 
-    private var promptBinding: Binding<String> {
+    var promptBinding: Binding<String> {
         Binding(
             get: { promptText },
             set: { applyPrompt($0) }
@@ -752,11 +758,12 @@ private struct SceneEditor: View {
     /// User scenes declare skills by referencing them inline; the stored list
     /// follows the prompt so removing a `{{skill:id}}` drops the dependency.
     private func applyPrompt(_ text: String) {
-        scene.instruction = text
-        scene.outputSpec = ""
-        var seen = Set<String>()
-        scene.requiredSkillIDs = SkillReference.parse(text)
-            .filter { seen.insert($0).inserted }
+        var updated = scene
+        updated.instruction = text
+        updated.outputSpec = ""
+        updated.requiredSkillIDs = SkillReference.parse(text)
+        // 一次输入只发布并保存一个完整场景，不对整库重复编码三次。
+        scene = updated
     }
 
     // MARK: - Skill references & preview
@@ -815,18 +822,8 @@ private struct SceneEditor: View {
                     )
                     .frame(width: 190)
                 }
-                ScrollView(.vertical) {
-                    Text(previewText(context: context))
-                        .font(Typo.paneCaption)
-                        .foregroundStyle(Theme.inkSecondary)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                }
-                .scrollIndicators(.visible)
-                .frame(height: 200)
-                .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.row))
+                ScenePromptText(text: previewText(context: context), height: 200, label: L10n.text("转发提示词预览"))
+                    .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.row))
             }
         }
     }
@@ -871,9 +868,10 @@ private struct SceneEditor: View {
 
     /// Inserts the token at the live prompt field's caret when it owns the
     /// focus — the field editor is an NSTextView — otherwise appends it.
-    private func insertSkillToken(_ id: String) {
+    func insertSkillToken(_ id: String) {
         let token = SkillReference.token(id)
-        if let textView = NSApp.keyWindow?.firstResponder as? NSTextView {
+        // 名称、说明和只读预览也可能成为 firstResponder，不能把技能写进它们。
+        if promptFocused, let textView = NSApp.keyWindow?.firstResponder as? NSTextView, textView.isEditable {
             textView.insertText(token, replacementRange: textView.selectedRange())
             return
         }

@@ -30,7 +30,7 @@ final class SceneSettingsViewTests: XCTestCase {
             pending.append(contentsOf: view.subviews)
             if let textView = view as? NSTextView { textViews.append(textView) }
         }
-        let editor = try XCTUnwrap(textViews.first { $0.string == prompt })
+        let editor = try XCTUnwrap(textViews.first { $0.isEditable && $0.string == prompt })
         let scroll = try XCTUnwrap(editor.enclosingScrollView)
         XCTAssertGreaterThan(scroll.frame.height, 0)
         XCTAssertLessThanOrEqual(scroll.frame.height, 160)
