@@ -54,6 +54,9 @@ final class ScenePromptTextTests: XCTestCase {
     private func showPreview(_ text: String) async throws -> (NSHostingView<ScenePromptText>, NSTextView) {
         _ = NSApplication.shared
         let host = NSHostingView(rootView: ScenePromptText(text: text, height: 200, label: "转发提示词预览"))
+        // 与设置窗口一致，由外层窗口给定尺寸，而不是用内容的理想尺寸收窄窗口。
+        host.sizingOptions = []
+        host.setFrameSize(NSSize(width: 600, height: 200))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 200), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host

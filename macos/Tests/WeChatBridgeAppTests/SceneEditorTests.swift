@@ -30,7 +30,8 @@ final class SceneEditorTests: XCTestCase {
         XCTAssertEqual(published.first?.outputSpec, "")
         XCTAssertEqual(published.first?.requiredSkillIDs, ["new-skill"])
         XCTAssertEqual(preferences.scenes.scenes[1], untouched)
-        XCTAssertEqual(Preferences(defaults: defaults).scenes, preferences.scenes)
+        // 重载会补齐官方模板，只比较必须原样保留的用户场景。
+        XCTAssertEqual(Preferences(defaults: defaults).scenes.scenes.filter { !$0.isOfficial }, preferences.scenes.scenes)
     }
 
     @MainActor
@@ -53,8 +54,11 @@ final class SceneEditorTests: XCTestCase {
     }
 
     @MainActor
-    func testInsertingSkillDoesNotModifyAnotherTextResponder() throws {
+    func testInsertingSkillDoesNotModifyAnotherTextResponder() async throws {
         _ = NSApplication.shared
+        let policy = NSApp.activationPolicy()
+        NSApp.setActivationPolicy(.accessory)
+        defer { NSApp.setActivationPolicy(policy) }
         var scene = WeChatScene(name: "名称", instruction: "提示词", outputSpec: "")
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let skills = SkillLibrary(resourcesRoot: nil, store: SkillStore(root: root, configDirectory: root))
@@ -67,7 +71,9 @@ final class SceneEditorTests: XCTestCase {
         let otherText = NSTextView()
         otherText.string = "场景名称或预览"
         window.contentView = otherText
+        NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertTrue(window.makeFirstResponder(otherText))
         XCTAssertTrue(NSApp.keyWindow === window)
         editor.insertSkillToken("new-skill")
