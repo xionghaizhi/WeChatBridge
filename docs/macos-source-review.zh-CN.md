@@ -62,9 +62,10 @@
 ## 验证状态
 
 Linux 环境只能执行 JSON/配置/脚本静态检查，不能运行依赖 AppKit 的 Swift 测试、macOS 签名、DMG 生成或分享扩展。
-本次加入了实际 `ScenePackage` 解码及 `ScenePrompt` 渲染测试，并将其纳入标签构建的 `swift test`；**配置了测试不等于测试已通过**。
-首次 GitHub Actions 构建和用户 Mac 安装、授权、转发、磁盘变化验证仍待执行。本报告不替代这些验收。
+本次加入了实际 `ScenePackage` 解码及 `ScenePrompt` 渲染测试，并将其纳入标签构建的 `swift test`。
+首次标签 `v0.1.15-test.1` 的 [Actions 运行](https://github.com/xionghaizhi/WeChatBridge/actions/runs/41769142988)已通过 Swift 测试（187 项、1 项跳过、0 失败）、翻译及发布配置检查；但打包因工作目录不正确失败，未发布安装包。新脚本已显式切到 macOS 包目录，后续标签的打包结果须以其 Actions 实际运行结果为准。
+用户 Mac 安装、授权、转发、磁盘变化仍待实机验证。本报告不替代这些验收。
 
 本地已通过：Actionlint 1.7.12、新脚本 `bash -n`、场景 JSON 字段/当前 AgentID 对照、工作流标签/权限/Action 固定版本检查、2 个合法标签的平台限制及 6 个非法标签拒绝用例、改动文件空白及文档本地链接检查。
 常见私钥和访问令牌的静态模式搜索未命中；这不是完整凭证检测或漏洞扫描的替代品。
-未改动 Windows、自有运行时代码及原公证发布脚本，未创建远端标签或发布安装包。
+未改动 Windows、自有运行时代码及原公证发布脚本。源码和首个测试标签已提交到本 Fork；是否产生可下载安装包须检查对应 Release，标签存在不等于打包成功。

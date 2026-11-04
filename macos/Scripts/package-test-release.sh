@@ -18,6 +18,7 @@ source "$ROOT/Scripts/share-slots.sh"
 OUTPUT="$ROOT/dist/test-release"
 APP="$ROOT/dist/$APP_BUNDLE_NAME"
 mkdir -p "$OUTPUT"
+cd "$ROOT"
 
 # Keep the certificate-based, notarized release path separate and unchanged.
 IDENTITY=- DISTRIBUTION=0 STORAGE_MODE=shared CONFIG=release \
