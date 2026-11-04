@@ -54,29 +54,19 @@ final class SceneEditorTests: XCTestCase {
     }
 
     @MainActor
-    func testInsertingSkillDoesNotModifyAnotherTextResponder() async throws {
+    func testInsertingSkillDoesNotModifyAnotherTextResponder() {
         _ = NSApplication.shared
-        let policy = NSApp.activationPolicy()
-        NSApp.setActivationPolicy(.accessory)
-        defer { NSApp.setActivationPolicy(policy) }
         var scene = WeChatScene(name: "名称", instruction: "提示词", outputSpec: "")
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let skills = SkillLibrary(resourcesRoot: nil, store: SkillStore(root: root, configDirectory: root))
         let binding = Binding(get: { scene }, set: { scene = $0 })
         let editor = SceneEditor(scene: binding, enabled: .constant(false), isDefault: false, toggleDefault: {}, skills: skills,
                                  duplicate: {}, moveUp: {}, moveDown: {}, export: {}, remove: {}, save: {})
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 200), styleMask: [.titled], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        defer { window.close() }
         let otherText = NSTextView()
         otherText.string = "场景名称或预览"
-        window.contentView = otherText
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-        try await Task.sleep(nanoseconds: 100_000_000)
-        XCTAssertTrue(window.makeFirstResponder(otherText))
-        XCTAssertTrue(NSApp.keyWindow === window)
-        editor.insertSkillToken("new-skill")
+        otherText.setSelectedRange(NSRange(location: 2, length: 0))
+        // CI 不保证桌面激活，直接传入菜单读取的响应者，验证它不会被误写。
+        editor.insertSkillToken("new-skill", firstResponder: otherText)
         XCTAssertEqual(otherText.string, "场景名称或预览")
         XCTAssertEqual(scene.instruction, "提示词 {{skill:new-skill}}")
         XCTAssertEqual(scene.name, "名称")

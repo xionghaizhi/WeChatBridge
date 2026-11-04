@@ -838,7 +838,7 @@ struct SceneEditor: View {
             }
             ForEach(choices, id: \.id) { choice in
                 Button("\(choice.name)（\(choice.id)）\(librarySuffix(for: choice.id))") {
-                    insertSkillToken(choice.id)
+                    insertSkillToken(choice.id, firstResponder: NSApp.keyWindow?.firstResponder)
                 }
             }
         } label: {
@@ -868,10 +868,10 @@ struct SceneEditor: View {
 
     /// Inserts the token at the live prompt field's caret when it owns the
     /// focus — the field editor is an NSTextView — otherwise appends it.
-    func insertSkillToken(_ id: String) {
+    func insertSkillToken(_ id: String, firstResponder: NSResponder?) {
         let token = SkillReference.token(id)
         // 名称、说明和只读预览也可能成为 firstResponder，不能把技能写进它们。
-        if promptFocused, let textView = NSApp.keyWindow?.firstResponder as? NSTextView, textView.isEditable {
+        if promptFocused, let textView = firstResponder as? NSTextView, textView.isEditable {
             textView.insertText(token, replacementRange: textView.selectedRange())
             return
         }
