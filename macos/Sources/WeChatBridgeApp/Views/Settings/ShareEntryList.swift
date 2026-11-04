@@ -224,7 +224,7 @@ struct ShareEntryList: View {
         }
 
         switch action {
-        case .codex: return L10n.text("激活 ChatGPT 并直接粘贴到输入框。")
+        case .codex: return L10n.text("先选择 Codex 对话，确认后粘贴，不自动发送。")
         case .claude: return L10n.text("激活 Claude 并直接粘贴到输入框。")
         case .doubao: return L10n.text("激活豆包并直接粘贴到输入框。")
         case .qwen: return L10n.text("激活千问办公并直接粘贴到输入框。")

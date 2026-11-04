@@ -3,6 +3,24 @@ import Foundation
 import XCTest
 
 final class SceneTests: XCTestCase {
+    func testLegacyGroupBindingsDoNotOptIntoAutomaticForwarding() throws {
+        let data = Data(#"{"displayName":"项目群","boundSceneID":"one","lastSceneID":"one"}"#.utf8)
+        let memory = try JSONDecoder().decode(GroupMemory.self, from: data)
+        XCTAssertEqual(memory.boundSceneIDs, ["one"])
+        XCTAssertEqual(memory.lastSceneID, "one")
+        XCTAssertNil(memory.automaticSceneID)
+    }
+
+    func testExplicitAutomaticSceneSurvivesEncodingAndAdvancing() throws {
+        let memory = GroupMemory(displayName: "项目群", automaticSceneID: "one")
+        let data = try JSONEncoder().encode(memory)
+        let restored = try JSONDecoder().decode(GroupMemory.self, from: data)
+        XCTAssertEqual(restored.automaticSceneID, "one")
+        let advanced = GroupMemory.advancing(restored, displayName: "项目群", sceneID: "two", senders: [], end: nil)
+        XCTAssertEqual(advanced.automaticSceneID, "one")
+        XCTAssertEqual(advanced.lastSceneID, "two")
+    }
+
     func testScenePackageRoundTripsWithoutLocalState() throws {
         let scene = WeChatScene(
             id: "com.example.customer-review",

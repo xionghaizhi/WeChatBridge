@@ -45,6 +45,19 @@ enum AutoPaste {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier)
     }
 
+    static func openCodex(applicationAt url: URL, newChat: Bool) async throws {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        configuration.addsToRecentItems = false
+        if newChat {
+            // Send the documented URL to Codex itself, not the system's arbitrary scheme owner.
+            let newThread = URL(string: "codex://threads/new")!
+            _ = try await NSWorkspace.shared.open([newThread], withApplicationAt: url, configuration: configuration)
+        } else {
+            _ = try await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+        }
+    }
+
     /// Brings the target forward and pastes into it.
     ///
     /// The wait is not decoration: `openApplication` returns as soon as the

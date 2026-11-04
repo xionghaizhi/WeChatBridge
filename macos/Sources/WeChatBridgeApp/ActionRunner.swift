@@ -40,6 +40,7 @@ final class ActionRunner {
     private let toast = ToastPresenter()
     private let notifier: DeliveryNotifier
     private let picker = TargetPickerPanel()
+    private let codexConversation = CodexConversationPanel()
     /// The forward currently in flight, so the next one waits for it.
     ///
     /// `forward` writes the clipboard and then suspends for seconds — launching
@@ -405,6 +406,12 @@ final class ActionRunner {
             fallBack(arrival, message: AutoPaste.Failure.notInstalled(name: name).localizedDescription)
             return
         }
+        var previousSummaryAt = context.previousSummaryAt
+        if bundleIdentifier == ShareAction.codex.targetBundleIdentifier {
+            guard let destination = await chooseCodexConversation(arrival, applicationURL: applicationURL) else { return }
+            // A new conversation has not seen the previous summary; analyse every selected message.
+            if destination == .newChat { previousSummaryAt = nil }
+        }
 
         // The files, or their paths as text for an app — a terminal — that
         // cannot take a pasted file. The list is asked, not the arrival: the
@@ -425,7 +432,7 @@ final class ActionRunner {
             }
             return ScenePrompt.render(
                 scene: scene,
-                previousSummaryAt: context.previousSummaryAt,
+                previousSummaryAt: previousSummaryAt,
                 currentEnd: context.insights.end,
                 skills: scene.effectiveSkillIDs.isEmpty
                     ? nil
@@ -517,6 +524,46 @@ final class ActionRunner {
                 plan: plan
             )
         }
+    }
+
+    private func chooseCodexConversation(
+        _ arrival: ArrivedBatch, applicationURL: URL
+    ) async -> CodexConversationPanel.Answer? {
+        let answer = await codexConversation.ask(.destination, near: NSEvent.mouseLocation)
+        switch answer {
+        case .newChat, .existingChat:
+            do {
+                let confirmed = try await confirmCodexConversation(
+                    arrival, applicationURL: applicationURL, newChat: answer == .newChat
+                )
+                return confirmed ? answer : nil
+            } catch {
+                fallBack(arrival, message: (error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+            }
+        case .cancelled, .confirmed:
+            model.recordFailure(L10n.text("已取消，未粘贴到 Codex。"), urls: arrival.urls)
+        case .expired:
+            model.recordExpired(urls: arrival.urls)
+        }
+        return nil
+    }
+
+    private func confirmCodexConversation(
+        _ arrival: ArrivedBatch, applicationURL: URL, newChat: Bool
+    ) async throws -> Bool {
+        guard arrival.isFresh else { model.recordExpired(urls: arrival.urls); return false }
+        try await AutoPaste.openCodex(applicationAt: applicationURL, newChat: newChat)
+        // Launch completion does not prove the new composer is ready; never guess with a sleep.
+        let answer = await codexConversation.ask(newChat ? .confirmNew : .confirmExisting, near: NSEvent.mouseLocation)
+        guard answer != .expired, arrival.isFresh else {
+            model.recordExpired(urls: arrival.urls)
+            return false
+        }
+        guard answer == .confirmed else {
+            model.recordFailure(L10n.text("已取消，未粘贴到 Codex。"), urls: arrival.urls)
+            return false
+        }
+        return true
     }
 
     /// Display names of the skills a delivered scene references that have no

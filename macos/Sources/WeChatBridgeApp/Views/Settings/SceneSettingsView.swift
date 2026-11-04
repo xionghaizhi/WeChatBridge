@@ -221,6 +221,8 @@ struct SceneSettingsView: View {
                     enabledScenes: preferences.scenes.enabledScenes,
                     disabledScenes: preferences.scenes.scenes.filter { !$0.enabled },
                     boundScenes: preferences.scenes.scenes(ids: memory.boundSceneIDs),
+                    automaticScene: preferences.scenes.scene(id: memory.automaticSceneID),
+                    askEveryTime: { preferences.groupMemory[key]?.automaticSceneID = nil },
                     toggle: { toggleBinding(sceneID: $0, groupKey: key) },
                     clear: { clearBinding(groupKey: key) }
                 )
@@ -392,6 +394,9 @@ struct SceneSettingsView: View {
         for key in Array(preferences.groupMemory.keys) where preferences.groupMemory[key]?.lastSceneID == scene.id {
             preferences.groupMemory[key]?.lastSceneID = nil
         }
+        for key in Array(preferences.groupMemory.keys) where preferences.groupMemory[key]?.automaticSceneID == scene.id {
+            preferences.groupMemory[key]?.automaticSceneID = nil
+        }
         selectedSceneID = preferences.scenes.scenes.indices.contains(index)
             ? preferences.scenes.scenes[index].id
             : preferences.scenes.scenes.last?.id
@@ -407,6 +412,7 @@ struct SceneSettingsView: View {
         guard var memory = preferences.groupMemory[groupKey] else { return }
         if memory.boundSceneIDs.contains(sceneID) {
             memory.boundSceneIDs.removeAll { $0 == sceneID }
+            if memory.automaticSceneID == sceneID { memory.automaticSceneID = nil }
         } else {
             memory.boundSceneIDs.append(sceneID)
         }
@@ -420,6 +426,7 @@ struct SceneSettingsView: View {
 
     private func clearBinding(groupKey: String) {
         preferences.groupMemory[groupKey]?.boundSceneIDs = []
+        preferences.groupMemory[groupKey]?.automaticSceneID = nil
     }
 
     private func export(_ scene: WeChatScene) {
@@ -959,6 +966,8 @@ private struct GroupBindingEditor: View {
     let enabledScenes: [WeChatScene]
     let disabledScenes: [WeChatScene]
     let boundScenes: [WeChatScene]
+    let automaticScene: WeChatScene?
+    let askEveryTime: () -> Void
     let toggle: (String) -> Void
     let clear: () -> Void
 
@@ -971,9 +980,21 @@ private struct GroupBindingEditor: View {
                     .foregroundStyle(Theme.inkSecondary)
             }
             Notice(L10n.text("每次转发只加载其中一个场景；不适用当前 Agent 的场景会自动跳过。"))
+            VStack(alignment: .leading, spacing: Space.s) {
+                if let automaticScene {
+                    Text(L10n.format("下次直接使用：%@", automaticScene.name))
+                        .font(Typo.paneBodyStrong)
+                    Button(L10n.text("恢复每次选择"), action: askEveryTime)
+                        .buttonStyle(SettingsActionButtonStyle(width: nil))
+                } else {
+                    Text(L10n.text("每次转发都选择场景，上次选择仅作预选。"))
+                        .font(Typo.paneCaption)
+                        .foregroundStyle(Theme.inkSecondary)
+                }
+            }
             VStack(alignment: .leading, spacing: 3) {
-                Text(L10n.text("可选场景")).font(Typo.rowTitle)
-                Text(L10n.text("勾选这个群聊可使用的场景；转发时再选择其中一个。"))
+                Text(L10n.text("优先场景")).font(Typo.rowTitle)
+                Text(L10n.text("用于预选，转发时仍可更换为其他已启用场景。"))
                     .font(Typo.paneCaption)
                     .foregroundStyle(Theme.inkSecondary)
             }

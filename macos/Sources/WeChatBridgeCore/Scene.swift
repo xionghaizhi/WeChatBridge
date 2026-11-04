@@ -466,6 +466,8 @@ public struct GroupMemory: Codable, Hashable, Sendable {
     public var displayName: String
     public var boundSceneIDs: [String]
     public var lastSceneID: String?
+    /// Only an explicit “do not ask again” choice may skip the scene picker.
+    public var automaticSceneID: String?
     public var lastSummaryAt: Date?
     public var senders: Set<String>
     public var updatedAt: Date
@@ -474,6 +476,7 @@ public struct GroupMemory: Codable, Hashable, Sendable {
         displayName: String,
         boundSceneIDs: [String] = [],
         lastSceneID: String? = nil,
+        automaticSceneID: String? = nil,
         lastSummaryAt: Date? = nil,
         senders: Set<String> = [],
         updatedAt: Date = Date()
@@ -482,6 +485,7 @@ public struct GroupMemory: Codable, Hashable, Sendable {
         var seen = Set<String>()
         self.boundSceneIDs = boundSceneIDs.filter { !$0.isEmpty && seen.insert($0).inserted }
         self.lastSceneID = lastSceneID
+        self.automaticSceneID = automaticSceneID
         self.lastSummaryAt = lastSummaryAt
         self.senders = senders
         self.updatedAt = updatedAt
@@ -499,6 +503,7 @@ public struct GroupMemory: Codable, Hashable, Sendable {
             boundSceneIDs = []
         }
         lastSceneID = try container.decodeIfPresent(String.self, forKey: .lastSceneID)
+        automaticSceneID = try container.decodeIfPresent(String.self, forKey: .automaticSceneID)
         lastSummaryAt = try container.decodeIfPresent(Date.self, forKey: .lastSummaryAt)
         senders = try container.decodeIfPresent(Set<String>.self, forKey: .senders) ?? []
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
@@ -509,6 +514,7 @@ public struct GroupMemory: Codable, Hashable, Sendable {
         try container.encode(displayName, forKey: .displayName)
         try container.encode(boundSceneIDs, forKey: .boundSceneIDs)
         try container.encodeIfPresent(lastSceneID, forKey: .lastSceneID)
+        try container.encodeIfPresent(automaticSceneID, forKey: .automaticSceneID)
         try container.encodeIfPresent(lastSummaryAt, forKey: .lastSummaryAt)
         try container.encode(senders, forKey: .senders)
         try container.encode(updatedAt, forKey: .updatedAt)
@@ -519,6 +525,7 @@ public struct GroupMemory: Codable, Hashable, Sendable {
         case boundSceneIDs
         case boundSceneID
         case lastSceneID
+        case automaticSceneID
         case lastSummaryAt
         case senders
         case updatedAt

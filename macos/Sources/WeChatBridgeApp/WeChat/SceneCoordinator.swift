@@ -32,15 +32,23 @@ final class SceneCoordinator {
     }
 
     private let preferences: Preferences
-    private let picker = ScenePickerPanel()
+    private let pickScene: @MainActor ([WeChatScene], String?, Bool, NSPoint) async -> ScenePickerPanel.Answer
     private let worker = DispatchQueue(
         label: "dev.wechatflow.scene-reader",
         qos: .userInitiated,
         attributes: .concurrent
     )
 
-    init(preferences: Preferences) {
+    init(
+        preferences: Preferences,
+        pickScene: (@MainActor ([WeChatScene], String?, Bool, NSPoint) async -> ScenePickerPanel.Answer)? = nil
+    ) {
         self.preferences = preferences
+        self.pickScene = pickScene ?? { scenes, preselectedID, allowsRemember, pointer in
+            await ScenePickerPanel().choose(
+                from: scenes, preselectedID: preselectedID, allowsRemember: allowsRemember
+            ) { FloatingCapsule.near(pointer, size: $0) }
+        }
     }
 
     func prepare(
@@ -89,85 +97,34 @@ final class SceneCoordinator {
             return .ready(selection)
         }
 
-        var resolution = SceneResolver.resolve(
+        let resolution = SceneResolver.resolve(
             groupName: selection.groupName,
             settings: preferences.scenes,
             memories: preferences.groupMemory,
             senders: selection.insights.senders,
             allowDefault: false
         )
-        if resolution.source != .binding && resolution.source != .fingerprint {
-            resolution = SceneResolution(
-                scenes: [],
-                groupName: resolution.groupName,
-                usedFingerprint: resolution.usedFingerprint,
-                source: .none
-            )
-        }
         selection.groupName = resolution.groupName ?? selection.groupName
-        let hasBinding = selection.groupName
-            .map(GroupName.normalize)
-            .flatMap { preferences.groupMemory[$0] }
-            .map { !preferences.scenes.scenes(ids: $0.boundSceneIDs).isEmpty } ?? false
-
-        if resolution.scenes.count > 1,
-           selection.groupName != nil {
-            let answer = await picker.choose(from: resolution.scenes) { size in
-                FloatingCapsule.near(pointer, size: size)
-            }
+        let memory = selection.groupName.map(GroupName.normalize).flatMap { preferences.groupMemory[$0] }
+        if let automatic = preferences.scenes.scene(id: memory?.automaticSceneID) {
+            selection.scenes = [automatic]
+        } else if !preferences.scenes.enabledScenes.isEmpty {
+            let preselectedID = preferences.scenes.scene(id: memory?.lastSceneID)?.id
+                ?? resolution.scene?.id
+                ?? (allowDefault ? preferences.scenes.defaultScene()?.id : nil)
+            let answer = await pickScene(
+                preferences.scenes.enabledScenes, preselectedID, selection.groupName != nil, pointer
+            )
             switch answer {
-            case .picked(let scene):
-                resolution = SceneResolution(
-                    scenes: [scene],
-                    groupName: selection.groupName,
-                    usedFingerprint: resolution.usedFingerprint,
-                    source: resolution.source
-                )
-            case .cancelled:
-                resolution = SceneResolution(
-                    scenes: [],
-                    groupName: selection.groupName,
-                    usedFingerprint: resolution.usedFingerprint,
-                    source: .none
-                )
-            case .expired:
-                return .expired
-            }
-        }
-
-        if resolution.scenes.isEmpty,
-           !hasBinding,
-           selection.groupName != nil,
-           !preferences.scenes.enabledScenes.isEmpty {
-            let answer = await picker.choose(from: preferences.scenes.enabledScenes) { size in
-                FloatingCapsule.near(pointer, size: size)
-            }
-            switch answer {
-            case .picked(let scene):
-                resolution = SceneResolution(
-                    scenes: [scene],
-                    groupName: selection.groupName,
-                    usedFingerprint: false,
-                    source: .binding
-                )
-                rememberBinding(scenes: [scene], groupName: selection.groupName)
+            case .picked(let scene, let remember):
+                selection.scenes = [scene]
+                rememberSelection(scene: scene, groupName: selection.groupName, automatically: remember)
             case .cancelled:
                 break
             case .expired:
                 return .expired
             }
         }
-
-        if resolution.scenes.isEmpty, allowDefault, let fallback = preferences.scenes.defaultScene() {
-            resolution = SceneResolution(
-                scenes: [fallback],
-                groupName: selection.groupName,
-                usedFingerprint: false,
-                source: .defaultScene
-            )
-        }
-
-        selection.scenes = resolution.scenes
         if let groupName = selection.groupName {
             selection.previousSummaryAt = preferences.groupMemory[GroupName.normalize(groupName)]?.lastSummaryAt
         }
@@ -194,12 +151,14 @@ final class SceneCoordinator {
         }
     }
 
-    private func rememberBinding(scenes: [WeChatScene], groupName: String?) {
+    private func rememberSelection(scene: WeChatScene, groupName: String?, automatically: Bool) {
         guard let groupName else { return }
         let key = GroupName.normalize(groupName)
         guard !key.isEmpty else { return }
         var memory = preferences.groupMemory[key] ?? GroupMemory(displayName: groupName)
-        memory.boundSceneIDs = scenes.map(\.id)
+        memory.lastSceneID = scene.id
+        memory.automaticSceneID = automatically ? scene.id : nil
+        if automatically, !memory.boundSceneIDs.contains(scene.id) { memory.boundSceneIDs.append(scene.id) }
         memory.updatedAt = Date()
         preferences.groupMemory[key] = memory
     }

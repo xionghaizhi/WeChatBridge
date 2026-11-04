@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 final class ScenePickerPanel {
     enum Answer: Sendable {
-        case picked(WeChatScene)
+        case picked(WeChatScene, remember: Bool)
         case cancelled
         case expired
     }
@@ -19,24 +19,33 @@ final class ScenePickerPanel {
     private var window: ScenePickerWindow?
     private var pending: CheckedContinuation<Answer, Never>?
     private var scenes: [WeChatScene] = []
+    private var allowsRemember = false
     private var deadline: Task<Void, Never>?
 
-    func choose(from scenes: [WeChatScene], place: (NSSize) -> NSRect) async -> Answer {
+    func choose(
+        from scenes: [WeChatScene],
+        preselectedID: String?,
+        allowsRemember: Bool,
+        place: (NSSize) -> NSRect
+    ) async -> Answer {
         await withCheckedContinuation { continuation in
-            present(scenes, place: place, continuation: continuation)
+            self.allowsRemember = allowsRemember
+            present(scenes, preselectedID: preselectedID, place: place, continuation: continuation)
         }
     }
 
     private func present(
         _ scenes: [WeChatScene],
+        preselectedID: String?,
         place: (NSSize) -> NSRect,
         continuation: CheckedContinuation<Answer, Never>
     ) {
         if pending != nil { finish(.cancelled) }
         pending = continuation
         self.scenes = scenes
-        state.highlighted = 0
-        state.selectedID = nil
+        state.highlighted = scenes.firstIndex { $0.id == preselectedID } ?? 0
+        state.selectedID = scenes.first { $0.id == preselectedID }?.id
+        state.remember = false
 
         let window = makeWindow()
         self.window = window
@@ -44,7 +53,7 @@ final class ScenePickerPanel {
         window.contentView = hosting
         let size = NSSize(
             width: Self.width,
-            height: max(Self.height(rows: scenes.count), FloatingCapsule.measure(hosting).height)
+            height: max(Self.height(rows: scenes.count, allowsRemember: allowsRemember), FloatingCapsule.measure(hosting).height)
         )
         window.setFrame(FloatingCapsule.fitted(place(size), to: hosting), display: true)
         window.alphaValue = Motion.systemReducesMotion ? 1 : 0
@@ -65,9 +74,9 @@ final class ScenePickerPanel {
         }
     }
 
-    private static func height(rows: Int) -> CGFloat {
+    private static func height(rows: Int, allowsRemember: Bool) -> CGFloat {
         let padding = (Space.s + 2) * 2
-        let chrome: CGFloat = 66
+        let chrome: CGFloat = allowsRemember ? 104 : 66
         let visible = CGFloat(min(max(rows, 1), visibleRows))
         return padding + chrome + rowHeight * visible
     }
@@ -76,6 +85,7 @@ final class ScenePickerPanel {
         ScenePickerView(
             scenes: scenes,
             state: state,
+            allowsRemember: allowsRemember,
             onToggle: { [weak self] index in self?.toggle(at: index) },
             onConfirm: { [weak self] in self?.finishSelection() },
             onDirect: { [weak self] in self?.finish(.cancelled) }
@@ -85,8 +95,9 @@ final class ScenePickerPanel {
     private func makeWindow() -> ScenePickerWindow {
         let window = ScenePickerWindow()
         window.onMove = { [weak self] delta in
-            guard let self else { return }
+            guard let self, !self.scenes.isEmpty else { return }
             self.state.move(by: delta, count: self.scenes.count)
+            self.state.selectedID = self.scenes[self.state.highlighted].id
         }
         window.onConfirm = { [weak self] in
             self?.finishSelection()
@@ -98,6 +109,7 @@ final class ScenePickerPanel {
     private func toggle(at index: Int) {
         guard scenes.indices.contains(index) else { return }
         let id = scenes[index].id
+        state.highlighted = index
         state.selectedID = state.selectedID == id ? nil : id
     }
 
@@ -108,7 +120,7 @@ final class ScenePickerPanel {
             finish(.cancelled)
             return
         }
-        finish(.picked(scene))
+        finish(.picked(scene, remember: allowsRemember && state.remember))
     }
 
     private func finish(_ answer: Answer) {
@@ -142,6 +154,7 @@ final class ScenePickerPanel {
 private final class ScenePickerState: ObservableObject {
     @Published var highlighted = 0
     @Published var selectedID: String?
+    @Published var remember = false
 
     func move(by delta: Int, count: Int) {
         guard count > 0 else { return }
@@ -183,6 +196,7 @@ private final class ScenePickerWindow: NSPanel {
 private struct ScenePickerView: View {
     let scenes: [WeChatScene]
     @ObservedObject var state: ScenePickerState
+    let allowsRemember: Bool
     let onToggle: (Int) -> Void
     let onConfirm: () -> Void
     let onDirect: () -> Void
@@ -244,12 +258,24 @@ private struct ScenePickerView: View {
                     }
                 }
                 .scrollBounceBehavior(.basedOnSize)
+                .onAppear {
+                    if let selectedID = state.selectedID { proxy.scrollTo(selectedID, anchor: .center) }
+                }
                 .onChange(of: state.highlighted) { _, highlighted in
                     guard scenes.indices.contains(highlighted) else { return }
                     proxy.scrollTo(scenes[highlighted].id, anchor: .center)
                 }
             }
             .frame(height: ScenePickerPanel.rowHeight * CGFloat(min(max(scenes.count, 1), ScenePickerPanel.visibleRows)))
+
+            if allowsRemember {
+                Toggle(L10n.text("此群以后使用这个场景，不再询问"), isOn: $state.remember)
+                    .toggleStyle(.checkbox)
+                    .font(Typo.paneCaption)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .disabled(state.selectedID == nil)
+                    .padding(.horizontal, Space.xs)
+            }
 
             HStack(spacing: Space.s) {
                 Button(L10n.text("直接转发"), action: onDirect)

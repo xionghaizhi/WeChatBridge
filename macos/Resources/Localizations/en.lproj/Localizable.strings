@@ -126,7 +126,6 @@
 "只复制，不自动粘贴" = "Copies only; does not paste automatically";
 "管理…" = "Manage…";
 "入口没有出现在微信菜单里？" = "Entry missing from WeChat’s menu?";
-"激活 ChatGPT 并直接粘贴到输入框。" = "Brings ChatGPT forward and pastes straight into its input.";
 "激活 Claude 并直接粘贴到输入框。" = "Brings Claude forward and pastes straight into its input.";
 "激活豆包并直接粘贴到输入框。" = "Brings Doubao forward and pastes straight into its input.";
 "激活 WeSight 并直接粘贴到输入框。" = "Brings WeSight forward and pastes straight into its input.";
@@ -294,8 +293,6 @@
 "直接转发" = "Forward Directly";
 "使用此场景" = "Use This Scene";
 "已关联 %d 个可选场景" = "%d optional scenes";
-"可选场景" = "Optional Scenes";
-"勾选这个群聊可使用的场景；转发时再选择其中一个。" = "Choose the scenes available to this group, then pick one when forwarding.";
 "每次转发只加载其中一个场景；不适用当前 Agent 的场景会自动跳过。" = "Only one scene is loaded per forward. Scenes that do not support the current Agent are skipped.";
 "已关闭的场景" = "Disabled Scenes";
 "启用后才能绑定到群聊。" = "Enable a scene before binding it to a group.";
@@ -533,3 +530,20 @@
 
 "请先安装 %@，再开启此入口。" = "Install %@ before enabling this entry.";
 "请先添加至少一个已安装的应用，再开启自定义入口。" = "Add at least one installed application before enabling the custom entry.";
+
+/* Forward destination and explicit scene choice */
+"此群以后使用这个场景，不再询问" = "Always use this scene for this chat; do not ask again";
+"下次直接使用：%@" = "Use automatically next time: %@";
+"恢复每次选择" = "Ask on every forward";
+"每次转发都选择场景，上次选择仅作预选。" = "Choose a scene on every forward. The previous choice is only preselected.";
+"优先场景" = "Preferred Scenes";
+"用于预选，转发时仍可更换为其他已启用场景。" = "Used for preselection. You can still choose another enabled scene when forwarding.";
+"发送到 Codex" = "Send to Codex";
+"只粘贴，不自动发送。" = "Paste only; do not send automatically.";
+"新建对话" = "New Conversation";
+"选择已有对话" = "Choose an Existing Conversation";
+"请确认 Codex 已打开新对话，并选好项目。若未新建，请先手动新建。" = "Confirm that Codex has opened a new conversation and choose a project. If not, create one manually first.";
+"请在 Codex 中选好要接收资料的对话，再继续粘贴。" = "Choose the receiving conversation in Codex before continuing.";
+"粘贴到这个对话" = "Paste into This Conversation";
+"已取消，未粘贴到 Codex。" = "Cancelled. Nothing was pasted into Codex.";
+"先选择 Codex 对话，确认后粘贴，不自动发送。" = "Choose a Codex conversation, then confirm to paste. Nothing is sent automatically.";
