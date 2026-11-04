@@ -601,6 +601,7 @@ private struct SceneEditor: View {
     /// first agent, mirroring the Windows preview; `.none` means clipboard /
     /// a custom app with no known agent.
     @State private var previewTarget: SkillPreviewTarget = .agent(AgentID.allCases[0])
+    @FocusState private var promptFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.l) {
@@ -635,9 +636,25 @@ private struct SceneEditor: View {
                         Spacer(minLength: Space.s)
                         insertSkillMenu
                     }
-                    TextField(L10n.text("提示词"), text: promptBinding, axis: .vertical)
-                        .lineLimit(5...9)
-                        .textFieldStyle(SettingsTextFieldStyle(multiline: true))
+                    // 自动增高的 TextField 会反复测量整段中文，阻塞设置窗口的布局。
+                    TextEditor(text: promptBinding)
+                        .font(SettingsControlMetrics.font)
+                        .foregroundStyle(Theme.ink)
+                        .scrollContentBackground(.hidden)
+                        .scrollIndicators(.visible)
+                        .padding(6)
+                        .frame(height: 160)
+                        .background(Theme.sunken, in: RoundedRectangle(cornerRadius: SettingsControlMetrics.radius))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: SettingsControlMetrics.radius)
+                                .strokeBorder(promptFocused ? Theme.ink : Theme.inputStroke,
+                                              lineWidth: promptFocused ? Stroke.focus : Stroke.hairline)
+                                .allowsHitTesting(false)
+                        }
+                        .focused($promptFocused)
+                        .focusEffectDisabled()
+                        .accessibilityLabel(Text(L10n.text("提示词")))
+                        .accessibilityIdentifier("scene.promptEditor")
                 }
             }
 
@@ -798,14 +815,18 @@ private struct SceneEditor: View {
                     )
                     .frame(width: 190)
                 }
-                Text(previewText(context: context))
-                    .font(Typo.paneCaption)
-                    .foregroundStyle(Theme.inkSecondary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.row))
+                ScrollView(.vertical) {
+                    Text(previewText(context: context))
+                        .font(Typo.paneCaption)
+                        .foregroundStyle(Theme.inkSecondary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                }
+                .scrollIndicators(.visible)
+                .frame(height: 200)
+                .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.row))
             }
         }
     }

@@ -36,13 +36,15 @@ hdiutil create -volname "WeChatBridge $VERSION Test" -srcfolder "$STAGING" \
 	-format UDZO -ov "$DMG"
 hdiutil verify "$DMG"
 
-cp "$REPO_ROOT/shared/Scenes/group-close-reading.wechatflow-scene.json" "$OUTPUT/"
+cp "$REPO_ROOT/shared/Scenes/"*.wechatflow-scene.json "$OUTPUT/"
+SCENES_ZIP="WeChatBridge-$TAG-scenes.zip"
+/usr/bin/zip -j "$OUTPUT/$SCENES_ZIP" "$REPO_ROOT/shared/Scenes/"*.wechatflow-scene.json
 cp "$REPO_ROOT/docs/macos-test-release.zh-CN.md" "$OUTPUT/TESTING.zh-CN.md"
 cp "$REPO_ROOT/docs/macos-source-review.zh-CN.md" "$OUTPUT/SOURCE-REVIEW.zh-CN.md"
 printf 'tag=%s\ncommit=%s\narchitectures=arm64 x86_64\nsigning=ad-hoc\nnotarized=false\n' \
 	"$TAG" "$(git -C "$REPO_ROOT" rev-parse HEAD)" > "$OUTPUT/build-info.txt"
 swift --version >> "$OUTPUT/build-info.txt"
 cd "$OUTPUT"
-shasum -a 256 "$(basename "$DMG")" group-close-reading.wechatflow-scene.json \
+shasum -a 256 "$(basename "$DMG")" *.wechatflow-scene.json "$SCENES_ZIP" \
 	TESTING.zh-CN.md SOURCE-REVIEW.zh-CN.md build-info.txt > SHA256SUMS.txt
 shasum -a 256 -c SHA256SUMS.txt
