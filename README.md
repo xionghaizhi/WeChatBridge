@@ -16,6 +16,8 @@
   <p><a href="https://render.qmuse.pub/p/muse/2413870555736078">官网 · render.qmuse.pub</a></p>
 </div>
 
+> 本 Fork 新增：[macOS 自用测试包与自动打包说明](docs/macos-test-release.zh-CN.md) · [群聊精读场景包](shared/Scenes/README.md) · [macOS 源码安全检查](docs/macos-source-review.zh-CN.md)。测试包只使用 ad-hoc 签名，未经 Apple 公证；下方原项目下载链接不属于本 Fork 的测试包。
+
 > [!NOTE]
 > 安装包统一通过蓝奏云发布：[Windows 版](https://wwbsr.lanzout.com/b0umjur4d)与 [macOS 版](https://wwbsr.lanzout.com/b0umjur8h)的提取密码均为 `向明`，详见[下载安装](#下载安装)。
 
