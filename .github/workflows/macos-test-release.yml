@@ -45,10 +45,54 @@ jobs:
       - name: Check release configuration
         run: macos/Scripts/check-release-config.sh
 
-      - name: Build universal ad-hoc test package
+      - name: Import the fixed self-use signing identity
+        id: signing
+        timeout-minutes: 5
+        env:
+          TEST_CERTIFICATE_BASE64: ${{ secrets.MACOS_TEST_CERTIFICATE_BASE64 }}
+          TEST_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_TEST_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          : "${TEST_CERTIFICATE_BASE64:?Configure MACOS_TEST_CERTIFICATE_BASE64 in repository secrets.}"
+          : "${TEST_CERTIFICATE_PASSWORD:?Configure MACOS_TEST_CERTIFICATE_PASSWORD in repository secrets.}"
+          CERTIFICATE_PATH="$RUNNER_TEMP/wechatbridge-test-signing.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/wechatbridge-test-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          trap 'rm -f "$CERTIFICATE_PATH"' EXIT
+          printf '%s' "$TEST_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$TEST_CERTIFICATE_PASSWORD" \
+            -t cert -f pkcs12 -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" > /dev/null
+          # Trust only this public certificate for signing on the disposable runner, never on the user's Mac.
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign \
+            -k /Library/Keychains/System.keychain macos/Resources/TestSigning.crt
+          touch "$RUNNER_TEMP/wechatbridge-test-signing-trusted"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+      - name: Build universal fixed-signature test package
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: bash macos/Scripts/package-test-release.sh "$RELEASE_TAG"
+
+      - name: Remove the temporary signing identity
+        if: ${{ always() && steps.signing.outcome != 'skipped' }}
+        run: |
+          CLEANUP_STATUS=0
+          if [ -f "$RUNNER_TEMP/wechatbridge-test-signing-trusted" ]; then
+            sudo security remove-trusted-cert -d macos/Resources/TestSigning.crt || CLEANUP_STATUS=1
+            rm "$RUNNER_TEMP/wechatbridge-test-signing-trusted" || CLEANUP_STATUS=1
+          fi
+          if [ -f "$RUNNER_TEMP/wechatbridge-test-signing.keychain-db" ]; then
+            security delete-keychain "$RUNNER_TEMP/wechatbridge-test-signing.keychain-db" || CLEANUP_STATUS=1
+          fi
+          rm -f "$RUNNER_TEMP/wechatbridge-test-signing.p12" || CLEANUP_STATUS=1
+          exit "$CLEANUP_STATUS"
 
       - name: Keep packaged files for publishing
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
