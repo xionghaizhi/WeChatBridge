@@ -82,16 +82,24 @@ jobs:
 
       - name: Remove the temporary signing identity
         if: ${{ always() && steps.signing.outcome != 'skipped' }}
+        timeout-minutes: 5
         run: |
+          set -uo pipefail
           CLEANUP_STATUS=0
-          if [ -f "$RUNNER_TEMP/wechatbridge-test-signing-trusted" ]; then
-            sudo security remove-trusted-cert -d macos/Resources/TestSigning.crt || CLEANUP_STATUS=1
-            rm "$RUNNER_TEMP/wechatbridge-test-signing-trusted" || CLEANUP_STATUS=1
-          fi
           if [ -f "$RUNNER_TEMP/wechatbridge-test-signing.keychain-db" ]; then
             security delete-keychain "$RUNNER_TEMP/wechatbridge-test-signing.keychain-db" || CLEANUP_STATUS=1
           fi
           rm -f "$RUNNER_TEMP/wechatbridge-test-signing.p12" || CLEANUP_STATUS=1
+          if [ -f "$RUNNER_TEMP/wechatbridge-test-signing-trusted" ]; then
+            # remove-trusted-cert can wait for GUI authorization on hosted macOS (runner-images#12116).
+            # Only this public certificate is deleted; remaining trust metadata dies with the disposable VM.
+            if CERTIFICATE_SHA1="$(openssl x509 -in macos/Resources/TestSigning.crt -noout -fingerprint -sha1 | cut -d= -f2 | tr -d ':')"; then
+              sudo security delete-certificate -Z "$CERTIFICATE_SHA1" /Library/Keychains/System.keychain || CLEANUP_STATUS=1
+            else
+              CLEANUP_STATUS=1
+            fi
+            rm "$RUNNER_TEMP/wechatbridge-test-signing-trusted" || CLEANUP_STATUS=1
+          fi
           exit "$CLEANUP_STATUS"
 
       - name: Keep packaged files for publishing
